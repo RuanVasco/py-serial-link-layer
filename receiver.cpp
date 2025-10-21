@@ -46,7 +46,6 @@ std::vector<char> decompress_data(const std::vector<char>& data) {
     return decompressed_data;
 }
 
-// Função para configurar a porta serial (idêntica à do sender)
 int configure_serial_port(const std::string& port_name) {
     int fd = open(port_name.c_str(), O_RDWR | O_NOCTTY);
     if (fd == -1) {
