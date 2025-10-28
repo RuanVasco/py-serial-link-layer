@@ -30,6 +30,7 @@ def listen_for_file_chunk(ser, file_handle):
 
         if data == b'EOF':
             print("\nRecebido comando 'EOF'. Finalizando.")
+            ser.write(b'ACK\n')
             return 'eof'
 
         file_handle.write(data)
