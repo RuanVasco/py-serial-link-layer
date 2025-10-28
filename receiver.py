@@ -19,12 +19,12 @@ def listen_for_file_chunk(ser, file_handle):
         if len(header_bytes) < 2:
             return 'continue' 
 
-        chunk_size = struct.unpack('>H', header_bytes)[0]
-        
+        chunk_size = struct.unpack('>H', header_bytes)[0]        
         data = ser.read(chunk_size)
 
         if len(data) < chunk_size:
             print("\nErro: Pacote incompleto recebido. Enviando NAK.")
+            print(f"Pacote: {data}")
             ser.write(b'NAK\n')
             return 'continue'
 

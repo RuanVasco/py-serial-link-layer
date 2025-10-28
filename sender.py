@@ -32,6 +32,7 @@ def wait_for_ack(ser):
         if response == b'ACK':
             return 'ACK'
         if response == b'NAK':
+            print("Recebeu NAK")
             return 'NAK'
         return 'TIMEOUT'
     except Exception as e:
