@@ -46,34 +46,19 @@ def main():
     
     while True:
         try:
+            print(f"Tentando conectar na porta {args.com}...")
             ser = serial.Serial(args.com, args.velocity, timeout=2)
-            print(f"Porta {args.com} aberta (Baud: {args.velocity}). Aguardando conexão...")
-            
-            while True:
-                line = ser.readline()
-                if line.strip() == b'hello':
-                    print("Recebido handshake 'hello', respondendo 'hello-back'")
-                    ser.write(b'hello-back\n')
-                    break
-                time.sleep(0.1)
-            
-            print(f"Conexão estabelecida. Pronto para receber e salvar em '{args.output}'")
-            
-            bytes_received = 0
+            print(f"Porta {args.com} aberta com sucesso. Aguardando dados...")
+
             with open(args.output, 'wb') as f:
                 while True:
                     status = listen_for_file_chunk(ser, f)
                     
                     if status == 'eof' or status == 'error':
-                        break 
-                    
-                    if status == 'data':
-                        bytes_received += 128
-                        sys.stdout.write(f"\rRecebendo... {bytes_received} bytes")
-                        sys.stdout.flush()
-
+                        break
+            
             print(f"\nTransferência concluída. Arquivo salvo em '{args.output}'.")
-            break
+            break 
 
         except serial.SerialException as e:
             print(f"\nErro de comunicação serial: {e}")
@@ -81,13 +66,20 @@ def main():
             if ser and ser.is_open:
                 ser.close()
             time.sleep(5)
+            
         except IOError as e:
             print(f"Erro ao criar o arquivo '{args.output}': {e}")
             break
-        finally:
+        
+        except Exception as e:
+            print(f"Erro inesperado no loop principal: {e}")
             if ser and ser.is_open:
                 ser.close()
-                print(f"Porta {args.com} fechada.")
+            time.sleep(5)
+
+    print("Programa finalizado.")
+    if ser and ser.is_open:
+        ser.close()
 
 if __name__ == "__main__":
     main()
