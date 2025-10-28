@@ -40,6 +40,7 @@ def listen_for_file_chunk(ser, file_handle):
         print(f"\nErro inesperado ao receber dado: {e}")
         return 'error'
 
+            
 def main():
     args = generate_arguments()
     ser = None
@@ -49,13 +50,24 @@ def main():
             print(f"Tentando conectar na porta {args.com}...")
             ser = serial.Serial(args.com, args.velocity, timeout=2)
             print(f"Porta {args.com} aberta com sucesso. Aguardando dados...")
+            
+            while True:
+                line = ser.readline()
+                if line.strip() == b'hello':
+                    print("Recebido handshake 'hello', respondendo 'hello-back'")
+                    ser.write(b'hello-back\n')
+                    break 
+                
+                time.sleep(0.1)
+            
+            print(f"Conexão estabelecida. Pronto para receber e salvar em '{args.output}'")
 
             with open(args.output, 'wb') as f:
                 while True:
                     status = listen_for_file_chunk(ser, f)
                     
                     if status == 'eof' or status == 'error':
-                        break
+                        break 
             
             print(f"\nTransferência concluída. Arquivo salvo em '{args.output}'.")
             break 
@@ -65,7 +77,7 @@ def main():
             print("Dispositivo desconectado ou porta indisponível. Tentando reconectar em 5 segundos...")
             if ser and ser.is_open:
                 ser.close()
-            time.sleep(5)
+            time.sleep(5) 
             
         except IOError as e:
             print(f"Erro ao criar o arquivo '{args.output}': {e}")
@@ -79,7 +91,7 @@ def main():
 
     print("Programa finalizado.")
     if ser and ser.is_open:
-        ser.close()
+        ser.close()            
 
 if __name__ == "__main__":
     main()
