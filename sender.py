@@ -56,7 +56,6 @@ def send_file_in_chunks(ser, filepath):
                     break  
                 
                 header = struct.pack('>H', len(chunk))
-                
                 retries = 0
                 ack_received = False
                 
@@ -89,7 +88,7 @@ def send_file_in_chunks(ser, filepath):
         eof_acked = False
         
         while not eof_acked and retries < MAX_RETRIES:
-            ser.write(eof_header)
+            ser.write(eof_header + eof_payload)
             response = wait_for_ack(ser)
             
             if response == 'ACK':
