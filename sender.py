@@ -1,12 +1,10 @@
+import sys
 import serial
 import os
 import struct  
+import argparse
 
-COM_PORT = 'COM3'
-BAUD_RATE = 9600
 TIMEOUT = 5  
-
-FILE_PATH = 'teste.txt'
 CHUNK_SIZE = 64  
 MAX_RETRIES = 3  
 
@@ -108,19 +106,28 @@ def send_file_in_chunks(ser, filepath):
     except Exception as e:
         print(f"\nErro durante o envio do arquivo: {e}")
         return False
+    
+def generate_arguments():
+    parser = argparse.ArgumentParser(description="Enviar arquivos utilizando porta serial.")
+    parser.add_argument("com", type=str, help="Nome da porta COM (ex: COM4 ou /dev/ttyUSB0).")
+    parser.add_argument("velocity", type=int, help="Velocidade da porta COM (baud rate, ex: 9600).")
+    parser.add_argument("path", type=str, help="Localização do arquivo a ser transferido.")
+    return parser.parse_args()
 
 def main():
-    if not os.path.exists(FILE_PATH):
-        with open(FILE_PATH, 'w') as f:
-            f.write("Esta é uma linha de teste.\n" * 20)
+    args = generate_arguments()
+    
+    if not os.path.exists(args.path):
+        print(f"Erro: O arquivo '{args.path}' não foi encontrado.")
+        sys.exit(1)
 
     ser = None
     try:
-        ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=TIMEOUT)
-        print(f"Porta {COM_PORT} aberta com sucesso.")
+        ser = serial.Serial(args.com, args.velocity, timeout=TIMEOUT)
+        print(f"Porta {args.com} aberta com sucesso.")
 
         if perform_handshake(ser):
-            send_file_in_chunks(ser, FILE_PATH)
+            send_file_in_chunks(ser, args.path)
         else:
             print("Não foi possível estabelecer comunicação com o receptor.")
 
