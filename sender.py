@@ -82,7 +82,8 @@ def send_file_in_chunks(ser, filepath):
                 print(f"Enviando... {bytes_sent}/{file_size} bytes ({progress:.2f}%)", end='\r')
 
         print("\nArquivo enviado. Enviando sinal de EOF...")
-        eof_header = struct.pack('>H', 0)
+        eof_payload = b'EOF'
+        eof_header = struct.pack('>H', len(eof_payload))
         retries = 0
         eof_acked = False
         
