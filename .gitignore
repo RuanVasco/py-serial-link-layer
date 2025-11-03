@@ -1,2 +1,5 @@
 .venv
 *.dat
+__pycache__/
+*.pyc
+*.py[cod]

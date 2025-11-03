@@ -1,12 +1,15 @@
 import sys
+import zlib
 import serial
 import os
 import struct  
 import argparse
 
 TIMEOUT = 5  
-CHUNK_SIZE = 64  
+PAYLOAD_SIZE = 64  
 MAX_RETRIES = 3  
+CRC_SIZE = 4    
+DATA_SIZE = PAYLOAD_SIZE - CRC_SIZE  
 
 def perform_handshake(ser):
     try:
@@ -51,22 +54,26 @@ def send_file_in_chunks(ser, filepath):
         with open(filepath, 'rb') as f:
             bytes_sent = 0
             while True:
-                chunk = f.read(CHUNK_SIZE)
-                if not chunk:
+                data = f.read(DATA_SIZE)
+                if not data:
                     break  
+
+                crc_val = zlib.crc32(data)
+                crc_bytes = struct.pack('>I', crc_val)
+                payload = data + crc_bytes
                 
-                header = struct.pack('>H', len(chunk))
+                header = struct.pack('>H', len(payload))
                 retries = 0
                 ack_received = False
                 
                 while not ack_received and retries < MAX_RETRIES:
-                    ser.write(header + chunk)
+                    ser.write(header + payload)
                     
                     response = wait_for_ack(ser)
                     
                     if response == 'ACK':
                         ack_received = True
-                        bytes_sent += len(chunk)
+                        bytes_sent += len(data)
                     elif response == 'NAK':
                         print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
                         retries += 1
@@ -82,11 +89,15 @@ def send_file_in_chunks(ser, filepath):
                 print(f"Enviando... {bytes_sent}/{file_size} bytes ({progress:.2f}%)", end='\r')
 
         print("\nArquivo enviado. Enviando sinal de EOF...")
-        eof_payload = b'EOF'
+        eof_data = b'EOF'
+        eof_crc_val = zlib.crc32(eof_data)
+        eof_crc_bytes = struct.pack('>I', eof_crc_val)
+        eof_payload = eof_data + eof_crc_bytes
+            
         eof_header = struct.pack('>H', len(eof_payload))
         retries = 0
         eof_acked = False
-        
+                
         while not eof_acked and retries < MAX_RETRIES:
             ser.write(eof_header + eof_payload)
             response = wait_for_ack(ser)

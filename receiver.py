@@ -1,8 +1,10 @@
 import argparse
 import struct
 import time
+import zlib
 import serial
-import sys
+
+CRC_SIZE = 4 
 
 def generate_arguments():
     """Configura e analisa os argumentos da linha de comando."""
@@ -19,15 +21,30 @@ def listen_for_file_chunk(ser, file_handle):
         if len(header_bytes) < 2:
             return 'continue' 
 
-        chunk_size = struct.unpack('>H', header_bytes)[0]        
-        data = ser.read(chunk_size)
+        payload_size = struct.unpack('>H', header_bytes)[0]
+        payload = ser.read(payload_size)
 
-        if len(data) < chunk_size:
+        if len(payload) < payload_size:
             print("\nErro: Pacote incompleto recebido. Enviando NAK.")
-            print(f"Pacote: {data}")
             ser.write(b'NAK\n')
             return 'continue'
+        
+        data = payload[:-CRC_SIZE]             # Tudo, exceto os últimos 4 bytes
+        crc_received_bytes = payload[-CRC_SIZE:]
 
+        try:
+            crc_received = struct.unpack('>I', crc_received_bytes)[0]
+            crc_calculated = zlib.crc32(data)
+        except Exception as e:
+            print(f"\nErro ao desempacotar CRC (pacote malformado): {e}. Enviando NAK.")
+            ser.write(b'NAK\n')
+            return 'continue'
+        
+        if crc_calculated != crc_received:
+            print(f"\nErro: Falha na verificação do CRC. (Recebido: {crc_received}, Calculado: {crc_calculated}). Enviando NAK.")
+            ser.write(b'NAK\n')
+            return 'continue'
+        
         if data == b'EOF':
             print("\nRecebido comando 'EOF'. Finalizando.")
             ser.write(b'ACK\n')
