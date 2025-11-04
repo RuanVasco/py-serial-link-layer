@@ -9,7 +9,7 @@ TYPE_PARAMS = 0
 TYPE_DATA = 1
 TYPE_EOF = 2
 
-CONNECTION_PARAMS = {
+CONN_PARAMS = {
     "data_size": 60,      
     "crc_size": 4,
     "max_retries": 3,
@@ -33,8 +33,8 @@ def process_packet(ser):
     Retorna ('TIMEOUT', None) em caso de inatividade.
     Retorna ('ERROR', None) em caso de erro de pacote.
     """
-    global CONNECTION_PARAMS
-    CRC_SIZE = CONNECTION_PARAMS["crc_size"]
+    global CONN_PARAMS
+    CRC_SIZE = CONN_PARAMS["crc_size"]
     
     try:
         type_header_bytes = ser.read(2)
@@ -96,17 +96,17 @@ def main():
                 
                 print("Aguardando parâmetros de conexão...")
                 
-                ser.timeout = CONNECTION_PARAMS["timeout"] 
+                ser.timeout = CONN_PARAMS["timeout"] 
                 
                 packet_type, payload_data = process_packet(ser)
                 
                 if packet_type == TYPE_PARAMS:
-                    global CONNECTION_PARAMS
+                    global CONN_PARAMS
                     try:
                         params = json.loads(payload_data.decode('utf-8'))
-                        CONNECTION_PARAMS.update(params) 
-                        ser.timeout = CONNECTION_PARAMS["timeout"] 
-                        print(f"Parâmetros recebidos e aplicados: {CONNECTION_PARAMS}")
+                        CONN_PARAMS.update(params) 
+                        ser.timeout = CONN_PARAMS["timeout"] 
+                        print(f"Parâmetros recebidos e aplicados: {CONN_PARAMS}")
                         ser.write(b'ACK\n')
                     except Exception as e:
                         print(f"Erro ao decodificar parâmetros: {e}")
