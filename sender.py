@@ -79,7 +79,6 @@ def wait_for_ack(ser):
         if response == b'ACK':
             return 'ACK'
         if response == b'NAK':
-            print("Recebeu NAK")
             return 'NAK'
         return 'TIMEOUT'
     except Exception as e:
@@ -93,8 +92,6 @@ def send_file_in_chunks(ser, filepath):
 
     file_size = os.path.getsize(filepath)
     print(f"Iniciando envio do arquivo '{filepath}' ({file_size} bytes)...")
-    
-    send_connection_params(ser)
 
     try:
         with open(filepath, 'rb') as f:

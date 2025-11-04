@@ -79,6 +79,7 @@ def main():
     
     args = generate_arguments()
     ser = None
+    newConnection = True
     
     while True:
         try:
@@ -90,16 +91,17 @@ def main():
             print(f"Porta {args.com} aberta. Aguardando handshake 'hello'...")
             
             while True: 
-                line = ser.readline()
-                if line.strip() == b'hello':
-                    print("Recebido handshake 'hello', respondendo 'hello-back'")
-                    ser.write(b'hello-back\n')
-                else:
-                    continue
-                
-                print("Aguardando parâmetros de conexão...")
-                
-                ser.timeout = CONN_PARAMS["timeout"] 
+                if (newConnection):
+                    line = ser.readline()
+                    if line.strip() == b'hello':
+                        print("Recebido handshake 'hello', respondendo 'hello-back'")
+                        ser.write(b'hello-back\n')
+                    else:
+                        continue
+                    
+                    print("Aguardando parâmetros de conexão...")
+                    
+                    ser.timeout = CONN_PARAMS["timeout"] 
                 
                 packet_type, payload_data = process_packet(ser)
                 
@@ -159,6 +161,8 @@ def main():
         except serial.SerialException as e:
             print(f"\nErro de comunicação serial: {e}")
             print("Dispositivo desconectado ou porta indisponível. Tentando reconectar em 5 segundos...")
+            if newConnection:
+                newConnection = False
             if ser and ser.is_open:
                 ser.close()
             time.sleep(5) 
