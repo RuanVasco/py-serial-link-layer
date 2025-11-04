@@ -88,7 +88,7 @@ def main():
                 ser.close()
             
             ser = serial.Serial(args.com, args.velocity, timeout=2) 
-            print(f"Porta {args.com} aberta. Aguardando handshake 'hello'...")
+            print(f"Porta {args.com} aberta. Aguardando...")
             
             while True: 
                 if (newConnection):
@@ -103,28 +103,28 @@ def main():
                     
                     ser.timeout = CONN_PARAMS["timeout"] 
                 
-                packet_type, payload_data = process_packet(ser)
-                
-                if packet_type == TYPE_PARAMS:
-                    try:
-                        params = json.loads(payload_data.decode('utf-8'))
-                        CONN_PARAMS.update(params) 
-                        ser.timeout = CONN_PARAMS["timeout"] 
-                        print(f"Parâmetros recebidos e aplicados: {CONN_PARAMS}")
-                        ser.write(b'ACK\n')
-                    except Exception as e:
-                        print(f"Erro ao decodificar parâmetros: {e}")
-                        ser.write(b'NAK\n')
+                    packet_type, payload_data = process_packet(ser)
+                    
+                    if packet_type == TYPE_PARAMS:
+                        try:
+                            params = json.loads(payload_data.decode('utf-8'))
+                            CONN_PARAMS.update(params) 
+                            ser.timeout = CONN_PARAMS["timeout"] 
+                            print(f"Parâmetros recebidos e aplicados: {CONN_PARAMS}")
+                            ser.write(b'ACK\n')
+                        except Exception as e:
+                            print(f"Erro ao decodificar parâmetros: {e}")
+                            ser.write(b'NAK\n')
+                            continue
+                    elif packet_type == 'TIMEOUT':
+                        print("Timeout esperando parâmetros.")
                         continue
-                elif packet_type == 'TIMEOUT':
-                    print("Timeout esperando parâmetros.")
-                    continue
-                else:
-                    print("Erro: Esperava parâmetros, recebi outro pacote.")
-                    ser.write(b'NAK\n')
-                    continue 
+                    else:
+                        print("Erro: Esperava parâmetros, recebi outro pacote.")
+                        ser.write(b'NAK\n')
+                        continue 
 
-                print(f"Pronto para receber e salvar em '{args.output}'")
+                    print(f"Pronto para receber e salvar em '{args.output}'")
                 timeout_counter = 0
                 print("Recebendo dados...")
                                 

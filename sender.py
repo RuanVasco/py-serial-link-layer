@@ -8,7 +8,7 @@ import argparse
 
 TIMEOUT = 5  
 PAYLOAD_SIZE = 64  
-MAX_RETRIES = 3  
+MAX_RETRIES = 15  
 CRC_SIZE = 4    
 DATA_SIZE = PAYLOAD_SIZE - CRC_SIZE  
 
