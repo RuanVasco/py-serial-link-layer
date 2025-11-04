@@ -15,6 +15,7 @@ CONN_PARAMS = {
     "max_retries": 3,
     "timeout": 5
 }
+
 MAX_INACTIVITY_TIMEOUTS = 5 
 
 def generate_arguments():
@@ -74,6 +75,8 @@ def process_packet(ser):
 
 
 def main():
+    global CONN_PARAMS
+    
     args = generate_arguments()
     ser = None
     
@@ -101,7 +104,6 @@ def main():
                 packet_type, payload_data = process_packet(ser)
                 
                 if packet_type == TYPE_PARAMS:
-                    global CONN_PARAMS
                     try:
                         params = json.loads(payload_data.decode('utf-8'))
                         CONN_PARAMS.update(params) 
