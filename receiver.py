@@ -181,6 +181,7 @@ def main():
             time.sleep(5)
 
     print("Programa finalizado.")
+    newConnection = True
     if ser and ser.is_open:
         ser.close()
 

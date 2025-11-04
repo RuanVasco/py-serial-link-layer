@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 import zlib
 import serial
 import os
@@ -177,28 +178,43 @@ def main():
         sys.exit(1)
 
     ser = None
-    try:
-        ser = serial.Serial(args.com, args.velocity, timeout=TIMEOUT)
-        print(f"Porta {args.com} aberta com sucesso.")
-
-        if perform_handshake(ser):
-            if send_connection_params(ser):
-                send_file_in_chunks(ser, args.path)
+    newConnection = True
+    while True:
+        try:
+            ser = serial.Serial(args.com, args.velocity, timeout=TIMEOUT)
+            print(f"Porta {args.com} aberta com sucesso.")
+            
+            if newConnection:
+                if perform_handshake(ser):
+                    if send_connection_params(ser):
+                        send_file_in_chunks(ser, args.path)
+                    else:
+                        print("Não foi possível enviar os parâmetros da conexão.")
+                else:
+                    print("Não foi possível estabelecer comunicação com o receptor.")
             else:
-                print("Não foi possível enviar os parâmetros da conexão.")
-        else:
-            print("Não foi possível estabelecer comunicação com o receptor.")
-
-    except serial.SerialException as e:
-        print(f"Erro ao abrir ou usar a porta serial: {e}")
-    except KeyboardInterrupt:
-        print("\n\nOperação cancelada pelo usuário. Fechando a porta...")
-    except Exception as e:
-        print(f"Ocorreu um erro inesperado: {e}")
-    finally:
-        if ser and ser.is_open:
-            ser.close()
-            print("Porta COM fechada.")
+                send_file_in_chunks(ser, args.path)
+                
+            break
+        except serial.SerialException as e:
+            print(f"Erro ao abrir ou usar a porta serial: {e}")
+            if newConnection:
+                newConnection = False
+            if ser and ser.is_open:
+                ser.close()
+            print("Tentando reconectar em 5 segundos...")
+            time.sleep(5)
+        except KeyboardInterrupt:
+            print("\n\nOperação cancelada pelo usuário. Fechando a porta...")
+            break
+        except Exception as e:
+            print(f"Ocorreu um erro inesperado: {e}")
+            break
+        
+    newConnection = True
+    if ser and ser.is_open:
+        ser.close()
+        print("Porta COM fechada.")
 
 if __name__ == "__main__":
     main()
