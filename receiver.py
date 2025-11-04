@@ -3,8 +3,19 @@ import struct
 import time
 import zlib
 import serial
+import json
 
-CRC_SIZE = 4 
+TYPE_PARAMS = 0
+TYPE_DATA = 1
+TYPE_EOF = 2
+
+CONNECTION_PARAMS = {
+    "data_size": 60,      
+    "crc_size": 4,
+    "max_retries": 3,
+    "timeout": 5
+}
+MAX_INACTIVITY_TIMEOUTS = 5 
 
 def generate_arguments():
     """Configura e analisa os argumentos da linha de comando."""
@@ -15,49 +26,53 @@ def generate_arguments():
                         help="Nome do arquivo para salvar os dados (padrão: received_file.dat).")
     return parser.parse_args()
 
-def listen_for_file_chunk(ser, file_handle):
+def process_packet(ser):
+    """
+    Lê e valida um pacote completo (tipo, tamanho, payload, crc).
+    Retorna (packet_type, payload_data) em caso de sucesso.
+    Retorna ('TIMEOUT', None) em caso de inatividade.
+    Retorna ('ERROR', None) em caso de erro de pacote.
+    """
+    global CONNECTION_PARAMS
+    CRC_SIZE = CONNECTION_PARAMS["crc_size"]
+    
     try:
-        header_bytes = ser.read(2)
-        if len(header_bytes) < 2:
-            return 'continue' 
+        type_header_bytes = ser.read(2)
+        if len(type_header_bytes) < 2:
+            return 'TIMEOUT', None 
 
-        payload_size = struct.unpack('>H', header_bytes)[0]
-        payload = ser.read(payload_size)
+        length_header_bytes = ser.read(2)
+        if len(length_header_bytes) < 2:
+            print("\nErro: Pacote malformado (faltou header de tamanho).")
+            return 'ERROR', None 
 
-        if len(payload) < payload_size:
-            print("\nErro: Pacote incompleto recebido. Enviando NAK.")
-            ser.write(b'NAK\n')
-            return 'continue'
+        packet_type = struct.unpack('>H', type_header_bytes)[0]
+        payload_length = struct.unpack('>H', length_header_bytes)[0]
+
+        payload_data = ser.read(payload_length)
+        if len(payload_data) < payload_length:
+            print("\nErro: Pacote incompleto (payload).")
+            return 'ERROR', None
         
-        data = payload[:-CRC_SIZE]           
-        crc_received_bytes = payload[-CRC_SIZE:]
+        crc_bytes = ser.read(CRC_SIZE)
+        if len(crc_bytes) < CRC_SIZE:
+            print("\nErro: Pacote incompleto (CRC).")
+            return 'ERROR', None
 
-        try:
-            crc_received = struct.unpack('>I', crc_received_bytes)[0]
-            crc_calculated = zlib.crc32(data)
-        except Exception as e:
-            print(f"\nErro ao desempacotar CRC (pacote malformado): {e}. Enviando NAK.")
-            ser.write(b'NAK\n')
-            return 'continue'
+        crc_received = struct.unpack('>I', crc_bytes)[0]
+        crc_calculated = zlib.crc32(payload_data)
         
         if crc_calculated != crc_received:
-            print(f"\nErro: Falha na verificação do CRC. (Recebido: {crc_received}, Calculado: {crc_calculated}). Enviando NAK.")
-            ser.write(b'NAK\n')
-            return 'continue'
+            print(f"\nErro: Falha no CRC. (Recebido: {crc_received}, Calculado: {crc_calculated}).")
+            return 'ERROR', None
         
-        if data == b'EOF':
-            print("\nRecebido comando 'EOF'. Finalizando.")
-            ser.write(b'ACK\n')
-            return 'eof'
+        return packet_type, payload_data
 
-        file_handle.write(data)
-        ser.write(b'ACK\n')
-        return 'data'     
     except Exception as e:
-        print(f"\nErro inesperado ao receber dado: {e}")
-        return 'error'
+        print(f"\nErro crítico ao processar pacote: {e}")
+        return 'ERROR', None
 
-            
+
 def main():
     args = generate_arguments()
     ser = None
@@ -65,29 +80,79 @@ def main():
     while True:
         try:
             print(f"Tentando conectar na porta {args.com}...")
-            ser = serial.Serial(args.com, args.velocity, timeout=2)
-            print(f"Porta {args.com} aberta com sucesso. Aguardando dados...")
+            if ser and ser.is_open:
+                ser.close()
             
-            while True:
+            ser = serial.Serial(args.com, args.velocity, timeout=2) 
+            print(f"Porta {args.com} aberta. Aguardando handshake 'hello'...")
+            
+            while True: 
                 line = ser.readline()
                 if line.strip() == b'hello':
                     print("Recebido handshake 'hello', respondendo 'hello-back'")
                     ser.write(b'hello-back\n')
-                    break 
+                else:
+                    continue
                 
-                time.sleep(0.1)
-            
-            print(f"Conexão estabelecida. Pronto para receber e salvar em '{args.output}'")
+                print("Aguardando parâmetros de conexão...")
+                
+                ser.timeout = CONNECTION_PARAMS["timeout"] 
+                
+                packet_type, payload_data = process_packet(ser)
+                
+                if packet_type == TYPE_PARAMS:
+                    global CONNECTION_PARAMS
+                    try:
+                        params = json.loads(payload_data.decode('utf-8'))
+                        CONNECTION_PARAMS.update(params) 
+                        ser.timeout = CONNECTION_PARAMS["timeout"] 
+                        print(f"Parâmetros recebidos e aplicados: {CONNECTION_PARAMS}")
+                        ser.write(b'ACK\n')
+                    except Exception as e:
+                        print(f"Erro ao decodificar parâmetros: {e}")
+                        ser.write(b'NAK\n')
+                        continue
+                elif packet_type == 'TIMEOUT':
+                    print("Timeout esperando parâmetros.")
+                    continue
+                else:
+                    print("Erro: Esperava parâmetros, recebi outro pacote.")
+                    ser.write(b'NAK\n')
+                    continue 
 
-            with open(args.output, 'wb') as f:
-                while True:
-                    status = listen_for_file_chunk(ser, f)
-                    
-                    if status == 'eof' or status == 'error':
-                        break 
-            
-            print(f"\nTransferência concluída. Arquivo salvo em '{args.output}'.")
-            break 
+                print(f"Pronto para receber e salvar em '{args.output}'")
+                timeout_counter = 0
+                
+                try:
+                    with open(args.output, 'wb') as f:
+                        while True:
+                            packet_type, payload_data = process_packet(ser)
+
+                            if packet_type == TYPE_DATA:
+                                timeout_counter = 0
+                                f.write(payload_data)
+                                ser.write(b'ACK\n')
+                                
+                            elif packet_type == TYPE_EOF:
+                                print(f"\nTransferência concluída. Arquivo salvo em '{args.output}'.")
+                                ser.write(b'ACK\n')
+                                break
+                                
+                            elif packet_type == 'TIMEOUT':
+                                timeout_counter += 1
+                                print(f"Aguardando dados... (Timeout {timeout_counter}/{MAX_INACTIVITY_TIMEOUTS})", end='\r')
+                                if timeout_counter >= MAX_INACTIVITY_TIMEOUTS:
+                                    print(f"\nLimite de inatividade atingido. Resetando conexão.")
+                                    break 
+                                    
+                            else: 
+                                print(f"\nPacote inesperado (tipo {packet_type}) ou erro. Enviando NAK.")
+                                ser.write(b'NAK\n')
+                                
+                except IOError as e:
+                    print(f"Erro ao escrever o arquivo '{args.output}': {e}")
+                
+                print("\nVoltando a aguardar por handshake...")
 
         except serial.SerialException as e:
             print(f"\nErro de comunicação serial: {e}")
@@ -96,19 +161,20 @@ def main():
                 ser.close()
             time.sleep(5) 
             
-        except IOError as e:
-            print(f"Erro ao criar o arquivo '{args.output}': {e}")
+        except KeyboardInterrupt:
+            print("\nOperação cancelada pelo usuário. Finalizando...")
             break
-        
+            
         except Exception as e:
             print(f"Erro inesperado no loop principal: {e}")
             if ser and ser.is_open:
                 ser.close()
+            print("Tentando reconectar em 5 segundos...")
             time.sleep(5)
 
     print("Programa finalizado.")
     if ser and ser.is_open:
-        ser.close()            
+        ser.close()
 
 if __name__ == "__main__":
     main()

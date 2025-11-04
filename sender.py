@@ -1,3 +1,4 @@
+import json
 import sys
 import zlib
 import serial
@@ -10,6 +11,10 @@ PAYLOAD_SIZE = 64
 MAX_RETRIES = 3  
 CRC_SIZE = 4    
 DATA_SIZE = PAYLOAD_SIZE - CRC_SIZE  
+
+TYPE_PARAMS = 0
+TYPE_DATA = 1
+TYPE_EOF = 2
 
 def perform_handshake(ser):
     try:
@@ -27,6 +32,45 @@ def perform_handshake(ser):
             
     except Exception as e:
         print(f"Erro durante o handshake: {e}")
+        return False
+    
+def send_connection_params(ser):
+    try:
+        print("Enviando parâmetros da conexão...")
+        
+        params_dict = {
+            "data_size": DATA_SIZE,
+            "max_retries": MAX_RETRIES,
+            "crc_size": CRC_SIZE,
+            "timeout": TIMEOUT
+        }
+        payload_data = json.dumps(params_dict).encode('utf-8')
+        type_header = struct.pack('>H', TYPE_PARAMS)
+        length_header = struct.pack('>H', len(payload_data))
+        crc_bytes = struct.pack('>I', zlib.crc32(payload_data))
+        packet = type_header + length_header + payload_data + crc_bytes
+        
+        retries = 0
+        while retries < MAX_RETRIES:
+            ser.write(packet)
+                    
+            response = wait_for_ack(ser)
+                                
+            if response == 'ACK':
+                print(f"Parâmetros enviados e confirmados: {params_dict}")
+                return True
+            elif response == 'NAK':
+                print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
+                retries += 1
+            else: 
+                print(f"\nSem resposta do receptor (timeout). Retentando... ({retries + 1})")
+                retries += 1                
+            
+        print(f"Falha ao enviar parâmetros após {retries} tentativas.")
+        return False
+    
+    except Exception as e:
+        print(f"Erro ao enviar os parâmetros de conexão: {e}")
         return False
 
 def wait_for_ack(ser):
@@ -49,31 +93,32 @@ def send_file_in_chunks(ser, filepath):
 
     file_size = os.path.getsize(filepath)
     print(f"Iniciando envio do arquivo '{filepath}' ({file_size} bytes)...")
+    
+    send_connection_params(ser)
 
     try:
         with open(filepath, 'rb') as f:
             bytes_sent = 0
             while True:
-                data = f.read(DATA_SIZE)
-                if not data:
+                payload_data = f.read(DATA_SIZE)
+                if not payload_data:
                     break  
-
-                crc_val = zlib.crc32(data)
-                crc_bytes = struct.pack('>I', crc_val)
-                payload = data + crc_bytes
                 
-                header = struct.pack('>H', len(payload))
+                type_header = struct.pack('>H', TYPE_DATA)
+                length_header = struct.pack('>H', len(payload_data))
+                crc_bytes = struct.pack('>I', zlib.crc32(payload_data))
+
+                packet = type_header + length_header + payload_data + crc_bytes
                 retries = 0
                 ack_received = False
                 
                 while not ack_received and retries < MAX_RETRIES:
-                    ser.write(header + payload)
-                    
+                    ser.write(packet)                    
                     response = wait_for_ack(ser)
                     
                     if response == 'ACK':
                         ack_received = True
-                        bytes_sent += len(data)
+                        bytes_sent += len(payload_data)
                     elif response == 'NAK':
                         print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
                         retries += 1
@@ -89,17 +134,18 @@ def send_file_in_chunks(ser, filepath):
                 print(f"Enviando... {bytes_sent}/{file_size} bytes ({progress:.2f}%)", end='\r')
 
         print("\nArquivo enviado. Enviando sinal de EOF...")
-        eof_data = b'EOF'
-        eof_crc_val = zlib.crc32(eof_data)
-        eof_crc_bytes = struct.pack('>I', eof_crc_val)
-        eof_payload = eof_data + eof_crc_bytes
-            
-        eof_header = struct.pack('>H', len(eof_payload))
+        type_header = struct.pack('>H', TYPE_EOF)
+        payload_data = b''
+        length_header = struct.pack('>H', len(payload_data))
+        crc_bytes = struct.pack('>I', zlib.crc32(payload_data))
+        
+        eof_packet = type_header + length_header + payload_data + crc_bytes
+        
         retries = 0
         eof_acked = False
                 
         while not eof_acked and retries < MAX_RETRIES:
-            ser.write(eof_header + eof_payload)
+            ser.write(eof_packet)
             response = wait_for_ack(ser)
             
             if response == 'ACK':
@@ -139,7 +185,10 @@ def main():
         print(f"Porta {args.com} aberta com sucesso.")
 
         if perform_handshake(ser):
-            send_file_in_chunks(ser, args.path)
+            if send_connection_params(ser):
+                send_file_in_chunks(ser, args.path)
+            else:
+                print("Não foi possível enviar os parâmetros da conexão.")
         else:
             print("Não foi possível estabelecer comunicação com o receptor.")
 
