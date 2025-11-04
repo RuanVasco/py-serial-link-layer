@@ -29,7 +29,7 @@ def listen_for_file_chunk(ser, file_handle):
             ser.write(b'NAK\n')
             return 'continue'
         
-        data = payload[:-CRC_SIZE]             # Tudo, exceto os últimos 4 bytes
+        data = payload[:-CRC_SIZE]           
         crc_received_bytes = payload[-CRC_SIZE:]
 
         try:
