@@ -12,7 +12,7 @@ TYPE_EOF = 2
 CONN_PARAMS = {
     "data_size": 60,      
     "crc_size": 4,
-    "max_retries": 3,
+    "max_retries": 15,
     "timeout": 5
 }
 
@@ -126,10 +126,12 @@ def main():
 
                 print(f"Pronto para receber e salvar em '{args.output}'")
                 timeout_counter = 0
-                
+                print("Recebendo dados...")
+                                
                 try:
                     with open(args.output, 'wb') as f:
                         while True:
+                           
                             packet_type, payload_data = process_packet(ser)
 
                             if packet_type == TYPE_DATA:
