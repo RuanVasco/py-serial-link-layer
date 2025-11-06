@@ -31,7 +31,7 @@ def main():
     current_params = ConnectionParams(timeout=2.0, max_retries=5, data_size=64) 
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
-        ser = serial.Serial(args.com, args.baudrate, timeout=current_params.timeout)
+        ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
         while True:
             try:
                 packet = Packet.from_serial(ser)
@@ -74,10 +74,10 @@ def main():
                     send_response(ser, PacketType.TYPE_NAK)
             except serial.SerialException as e:
                 print(f"Erro de hardware: {e}. Tentando reabrir porta...")
-                if ser and ser.is_open():
+                if ser and ser.is_open:
                     ser.close()
                 time.sleep(2)
-                ser = serial.Serial(args.com, args.baudrate, timeout=current_params.timeout)
+                ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
             except Exception as e:
                 print(f"Erro inesperado no loop: {e}")
 
@@ -90,7 +90,7 @@ def main():
         if file_writer:
             file_writer.close()
             
-        if ser and ser.is_open():
+        if ser and ser.is_open:
             ser.close()
         
 

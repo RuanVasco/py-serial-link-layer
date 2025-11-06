@@ -160,7 +160,7 @@ def main():
     ) 
             
     new_connection = True
-    ser = serial.Serial(args.com, args.baudrate, timeout=params.timeout)
+    ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
     
     while(True):
         try:           
@@ -183,16 +183,16 @@ def main():
         except serial.SerialException as e:
             print(f"Erro de hardware: {e}")
             print(f"Tentando reconectar em 2 segundos...")
-            if ser and ser.is_open():
+            if ser and ser.is_open:
                 ser.close()
             time.sleep(2)
-            ser = serial.Serial(args.com, args.baudrate, timeout=params.timeout)
+            ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
         
         except KeyboardInterrupt:
             print("\nEnvio cancelado pelo usuário.")
             break
            
-    if ser and ser.is_open():
+    if ser and ser.is_open:
         ser.close()
 if __name__ == "__main__":
     main()
