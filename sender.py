@@ -1,92 +1,85 @@
-import json
+import argparse
+import os
 import sys
 import time
-import zlib
+
 import serial
-import os
-import struct  
-import argparse
 
-TIMEOUT = 5  
-PAYLOAD_SIZE = 64  
-MAX_RETRIES = 15  
-CRC_SIZE = 4    
-DATA_SIZE = PAYLOAD_SIZE - CRC_SIZE  
+from model.connection_params import ConnectionParams
+from model.packet_type import PacketType
+from model.packet import Packet
 
-TYPE_PARAMS = 0
-TYPE_DATA = 1
-TYPE_EOF = 2
+def generate_arguments():
+    parser = argparse.ArgumentParser(description="Enviar arquivos utilizando porta serial.")
+    parser.add_argument("com", type=str, help="Nome da porta COM (ex: COM4 ou /dev/ttyUSB0).")
+    parser.add_argument("-b", "--baudrate", type=int, default=9600,
+                        help="Velocidade da porta COM (baud rate, ex: 9600).")
+    parser.add_argument("path", type=str, help="Localização do arquivo a ser transferido.")
+    return parser.parse_args()
 
-def perform_handshake(ser):
+def wait_for_packet(ser, expected_type):
     try:
-        print("Iniciando handshake... (Pressione Ctrl+C para cancelar)")
-        ser.reset_input_buffer() 
-        ser.write(b'hello\n')
-        response = ser.readline().strip()
-
-        if response == b'hello-back':
-            print("Handshake bem-sucedido! O receptor está pronto.")
-            return True
-        else:
-            print(f"Falha no handshake. Resposta recebida: '{response.decode(errors='ignore')}'")
-            return False
-            
+        packet = Packet.from_serial(ser)
+        if packet:
+            if packet.type == expected_type:
+                return 'ACK' 
+            if packet.type == PacketType.TYPE_NAK:
+                return 'NAK'
+        
+        return 'TIMEOUT'
     except Exception as e:
-        print(f"Erro durante o handshake: {e}")
-        return False
+        print(f"\nErro ao aguardar pacote: {e}")
+        return 'TIMEOUT'
+
+def perform_handshake(ser, max_retries):
+    print("Iniciando handshake...")
+    packet = Packet(PacketType.TYPE_HANDSHAKE, "")
+    ser.reset_input_buffer() 
     
-def send_connection_params(ser):
-    try:
-        print("Enviando parâmetros da conexão...")
-        
-        params_dict = {
-            "data_size": DATA_SIZE,
-            "max_retries": MAX_RETRIES,
-            "crc_size": CRC_SIZE,
-            "timeout": TIMEOUT
-        }
-        payload_data = json.dumps(params_dict).encode('utf-8')
-        type_header = struct.pack('>H', TYPE_PARAMS)
-        length_header = struct.pack('>H', len(payload_data))
-        crc_bytes = struct.pack('>I', zlib.crc32(payload_data))
-        packet = type_header + length_header + payload_data + crc_bytes
-        
-        retries = 0
-        while retries < MAX_RETRIES:
-            ser.write(packet)
-                    
-            response = wait_for_ack(ser)
-                                
-            if response == 'ACK':
-                print(f"Parâmetros enviados e confirmados: {params_dict}")
+    for attempt in range(max_retries):
+        print(f"Tentativa de handshake [{attempt + 1}/{max_retries}]...")
+        try: 
+            ser.write(packet.get_full_packet_bytes())
+            
+            response = wait_for_packet(ser, PacketType.TYPE_HANDSHAKE)
+            
+            if response == 'ACK': 
+                print("Handshake bem-sucedido! O receptor está pronto.")
                 return True
-            elif response == 'NAK':
-                print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
-                retries += 1
-            else: 
-                print(f"\nSem resposta do receptor (timeout). Retentando... ({retries + 1})")
-                retries += 1                
-            
-        print(f"Falha ao enviar parâmetros após {retries} tentativas.")
-        return False
+            else:
+                print(f"Resposta não recebida ou incorreta.")
+                
+            if attempt < max_retries - 1:
+                time.sleep(1.0)
+                
+        except serial.SerialException as e:
+            print(f"Erro de hardware na tentativa: {e}")
+            time.sleep(1.0)
     
-    except Exception as e:
-        print(f"Erro ao enviar os parâmetros de conexão: {e}")
-        return False
+    print("Falha no handshake após todas as tentativas.")
+    return False
 
-def wait_for_ack(ser):
-    try:
-        response = ser.readline().strip()
-        if response == b'ACK':
-            return 'ACK'
-        if response == b'NAK':
-            return 'NAK'
-        return 'TIMEOUT'
-    except Exception as e:
-        print(f"\nErro ao aguardar ACK: {e}")
-        return 'TIMEOUT'
+def send_connection_params(ser, params):
+    packet = Packet(PacketType.TYPE_PARAMS, params)
+    
+    for attempt in range(params.max_retries):
+        print(f"Enviando parâmetros da conexão, tentativa [{attempt + 1}/{params.max_retries}]...")
+        ser.write(packet.get_full_packet_bytes())
+        
+        response = wait_for_packet(ser, PacketType.TYPE_ACK)
+            
+        if response == 'ACK':
+            print(f"Parâmetros enviados e confirmados.")
+            return True
+        elif response == 'NAK':
+            print(f"\nReceptor reportou erro (NAK). Retentando...")
+        else: 
+            print(f"\nSem resposta do receptor (timeout). Retentando...")
+    
+    print("Falha no envio dos parâmetros após todas as tentativas.")
+    return False
 
-def send_file_in_chunks(ser, filepath):
+def send_file_in_chunks(ser, filepath, data_size, max_retries):
     if not os.path.exists(filepath):
         print(f"Erro: Arquivo '{filepath}' não encontrado.")
         return False
@@ -94,127 +87,112 @@ def send_file_in_chunks(ser, filepath):
     file_size = os.path.getsize(filepath)
     print(f"Iniciando envio do arquivo '{filepath}' ({file_size} bytes)...")
 
-    try:
-        with open(filepath, 'rb') as f:
-            bytes_sent = 0
-            while True:
-                payload_data = f.read(DATA_SIZE)
-                if not payload_data:
-                    break  
-                
-                type_header = struct.pack('>H', TYPE_DATA)
-                length_header = struct.pack('>H', len(payload_data))
-                crc_bytes = struct.pack('>I', zlib.crc32(payload_data))
+    with open(filepath, 'rb') as f:
+        bytes_sent = 0
+        
+        while True:
+            payload_data = f.read(data_size)
+            if not payload_data:
+                break 
 
-                packet = type_header + length_header + payload_data + crc_bytes
-                retries = 0
-                ack_received = False
+            packet = Packet(PacketType.TYPE_DATA, payload_data)
+            retries = 0
+            ack_received = False
+            
+            while not ack_received and retries < max_retries:
+                ser.write(packet.get_full_packet_bytes())
                 
-                while not ack_received and retries < MAX_RETRIES:
-                    ser.write(packet)                    
-                    response = wait_for_ack(ser)
+                response = wait_for_packet(ser, PacketType.TYPE_ACK)
                     
-                    if response == 'ACK':
-                        ack_received = True
-                        bytes_sent += len(payload_data)
-                    elif response == 'NAK':
-                        print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
-                        retries += 1
-                    else: 
-                        print(f"\nSem resposta do receptor (timeout). Retentando... ({retries + 1})")
-                        retries += 1
-                
-                if not ack_received:
-                    print(f"\nFalha ao enviar chunk após {MAX_RETRIES} tentativas. Abortando.")
-                    return False 
+                if response == 'ACK':
+                    ack_received = True
+                    bytes_sent += len(payload_data)
+                elif response == 'NAK':
+                    print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
+                    retries += 1
+                else: 
+                    print(f"\nSem resposta do receptor (timeout). Retentando... ({retries + 1})")
+                    retries += 1
 
                 progress = (bytes_sent / file_size) * 100
                 print(f"Enviando... {bytes_sent}/{file_size} bytes ({progress:.2f}%)", end='\r')
-
-        print("\nArquivo enviado. Enviando sinal de EOF...")
-        type_header = struct.pack('>H', TYPE_EOF)
-        payload_data = b''
-        length_header = struct.pack('>H', len(payload_data))
-        crc_bytes = struct.pack('>I', zlib.crc32(payload_data))
-        
-        eof_packet = type_header + length_header + payload_data + crc_bytes
-        
-        retries = 0
-        eof_acked = False
-                
-        while not eof_acked and retries < MAX_RETRIES:
-            ser.write(eof_packet)
-            response = wait_for_ack(ser)
             
-            if response == 'ACK':
-                eof_acked = True
-            else:
-                print(f"Receptor não confirmou EOF. Retentando... ({retries + 1})")
-                retries += 1
-        
-        if eof_acked:
-            print("Transferência concluída com sucesso!")
-            return True
-        else:
-            print("Falha ao finalizar a transferência. O receptor pode estar offline.")
-            return False
+            if not ack_received:
+                print(f"\nFalha ao enviar chunk após {max_retries} tentativas. Abortando.")
+                return False
 
-    except Exception as e:
-        print(f"\nErro durante o envio do arquivo: {e}")
+    print("\nArquivo enviado. Enviando sinal de EOF...")
+    eof_packet = Packet(PacketType.TYPE_EOF, "")
+    
+    retries = 0
+    eof_acked = False
+        
+    while not eof_acked and retries < max_retries:
+        ser.write(eof_packet.get_full_packet_bytes())
+        response = wait_for_packet(ser, PacketType.TYPE_ACK)
+        
+        if response == 'ACK':
+            eof_acked = True
+        else:
+            print(f"Receptor não confirmou EOF. Retentando... ({retries + 1})")
+            retries += 1
+    
+    if eof_acked:
+        print("Transferência concluída com sucesso!")
+        return True
+    else:
+        print("Falha ao finalizar a transferência. O receptor pode estar offline.")
         return False
     
-def generate_arguments():
-    parser = argparse.ArgumentParser(description="Enviar arquivos utilizando porta serial.")
-    parser.add_argument("com", type=str, help="Nome da porta COM (ex: COM4 ou /dev/ttyUSB0).")
-    parser.add_argument("velocity", type=int, help="Velocidade da porta COM (baud rate, ex: 9600).")
-    parser.add_argument("path", type=str, help="Localização do arquivo a ser transferido.")
-    return parser.parse_args()
-
 def main():
     args = generate_arguments()
     
     if not os.path.exists(args.path):
         print(f"Erro: O arquivo '{args.path}' não foi encontrado.")
         sys.exit(1)
-
+    
     ser = None
-    newConnection = True
-    while True:
-        try:
-            ser = serial.Serial(args.com, args.velocity, timeout=TIMEOUT)
-            print(f"Porta {args.com} aberta com sucesso.")
+    
+    params = ConnectionParams(
+        timeout = 2.0, 
+        max_retries = 5,
+        data_size = 1024, 
+    ) 
             
-            if newConnection:
-                if perform_handshake(ser):
-                    if send_connection_params(ser):
-                        send_file_in_chunks(ser, args.path)
-                    else:
-                        print("Não foi possível enviar os parâmetros da conexão.")
-                else:
-                    print("Não foi possível estabelecer comunicação com o receptor.")
-            else:
-                send_file_in_chunks(ser, args.path)
+    new_connection = True
+    ser = serial.Serial(args.com, args.baudrate, timeout=params.timeout)
+    
+    while(True):
+        try:           
+            if new_connection:
+                if not perform_handshake(ser, params.max_retries):
+                    ser.close()
+                    time.sleep(2)
+                    continue
                 
+                if not send_connection_params(ser, params):
+                    ser.close()
+                    time.sleep(2)
+                    continue
+                
+                new_connection = False
+                
+            send_file_in_chunks(ser, args.path, params.data_size, params.max_retries)                
             break
+            
         except serial.SerialException as e:
-            print(f"Erro ao abrir ou usar a porta serial: {e}")
-            if newConnection:
-                newConnection = False
-            if ser and ser.is_open:
+            print(f"Erro de hardware: {e}")
+            print(f"Tentando reconectar em 2 segundos...")
+            if ser and ser.is_open():
                 ser.close()
-            print("Tentando reconectar em 5 segundos...")
-            time.sleep(5)
-        except KeyboardInterrupt:
-            print("\n\nOperação cancelada pelo usuário. Fechando a porta...")
-            break
-        except Exception as e:
-            print(f"Ocorreu um erro inesperado: {e}")
-            break
+            time.sleep(2)
+            ser = serial.Serial(args.com, args.baudrate, timeout=params.timeout)
         
-    newConnection = True
-    if ser and ser.is_open:
+        except KeyboardInterrupt:
+            print("\nEnvio cancelado pelo usuário.")
+            break
+           
+    if ser and ser.is_open():
         ser.close()
-        print("Porta COM fechada.")
-
 if __name__ == "__main__":
     main()
