@@ -34,7 +34,6 @@ def main():
     current_params = ConnectionParams(timeout=2.0, max_retries=5, data_size=64) 
         
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
-    print(f"Salvando arquivo como: {output_filepath}")
     
     try:
         ser = serial.Serial(args.com, args.baudrate, timeout=current_params.timeout)
@@ -52,9 +51,7 @@ def main():
                         continue
                         
                     print("Handshake recebido. Enviando resposta...")
-                    send_response(ser, PacketType.TYPE_HANDSHAKE)
-                    new_connection = False
-                
+                    send_response(ser, PacketType.TYPE_HANDSHAKE)                    
                 elif packet.type == PacketType.TYPE_PARAMS:
                     if not new_connection:
                         send_response(ser, PacketType.TYPE_NAK)
@@ -70,6 +67,7 @@ def main():
                         send_response(ser, PacketType.TYPE_NAK)
 
                 elif packet.type == PacketType.TYPE_DATA:
+                    new_connection = False
                     if file_writer is None:
                         file_writer = open(output_filepath, 'wb')
                     
