@@ -28,7 +28,7 @@ def main():
     ser = None
     file_writer = None
     new_connection = True
-    current_params = ConnectionParams(timeout=2.0, max_retries=5, data_size=64) 
+    current_params = ConnectionParams(timeout=90, max_retries=90, data_size=64) 
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
         ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
