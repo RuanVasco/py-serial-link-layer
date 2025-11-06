@@ -24,39 +24,29 @@ def send_response(ser, type: PacketType):
 
 def main():
     args = generate_arguments()
-    
     output_filepath = args.output
-    
     ser = None
     file_writer = None
     new_connection = True
-    
     current_params = ConnectionParams(timeout=2.0, max_retries=5, data_size=64) 
-        
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
-    
     try:
         ser = serial.Serial(args.com, args.baudrate, timeout=current_params.timeout)
-        
         while True:
             try:
                 packet = Packet.from_serial(ser)
-                
                 if not packet:
                     continue
-                
                 if packet.type == PacketType.TYPE_HANDSHAKE:
                     if not new_connection:
                         send_response(ser, PacketType.TYPE_NAK)
                         continue
-                        
                     print("Handshake recebido. Enviando resposta...")
                     send_response(ser, PacketType.TYPE_HANDSHAKE)                    
                 elif packet.type == PacketType.TYPE_PARAMS:
                     if not new_connection:
                         send_response(ser, PacketType.TYPE_NAK)
                         continue
-                    
                     try:
                         current_params = packet.data
                         ser.timeout = current_params.timeout
@@ -65,36 +55,29 @@ def main():
                     except Exception as e:
                         print(f"Erro ao processar parâmetros: {e}")
                         send_response(ser, PacketType.TYPE_NAK)
-
                 elif packet.type == PacketType.TYPE_DATA:
                     new_connection = False
                     if file_writer is None:
                         file_writer = open(output_filepath, 'wb')
-                    
                     file_writer.write(packet.data)
                     print(f"Recebido chunk de {len(packet.data)} bytes.", end='\r')
                     send_response(ser, PacketType.TYPE_ACK)
-
                 elif packet.type == PacketType.TYPE_EOF:
                     print("\nSinal de EOF recebido. Finalizando...")
                     if file_writer:
                         file_writer.close()
                         file_writer = None
-                    
                     send_response(ser, PacketType.TYPE_ACK)
                     print(f"Arquivo salvo com sucesso em {output_filepath}. Reiniciando...")
-                    
                 else:
                     print(f"Pacote de tipo inesperado recebido: {packet.type}")
                     send_response(ser, PacketType.TYPE_NAK)
-
             except serial.SerialException as e:
                 print(f"Erro de hardware: {e}. Tentando reabrir porta...")
                 if ser and ser.is_open():
                     ser.close()
                 time.sleep(2)
                 ser = serial.Serial(args.com, args.baudrate, timeout=current_params.timeout)
-            
             except Exception as e:
                 print(f"Erro inesperado no loop: {e}")
 
@@ -106,6 +89,7 @@ def main():
     finally:
         if file_writer:
             file_writer.close()
+            
         if ser and ser.is_open():
             ser.close()
         
