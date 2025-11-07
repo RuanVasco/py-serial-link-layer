@@ -19,22 +19,28 @@ def generate_arguments():
     return parser.parse_args()
 
 def wait_for_packet(ser, expected_type):
-    try:
-        packet = Packet.from_serial(ser)
-        if packet:
-            if packet.type == expected_type:
-                return 'ACK' 
-            if packet.type == PacketType.TYPE_NAK:
-                return 'NAK'
-            if packet.type == PacketType.TYPE_WAITING_DATA:
-                return 'WAITING_DATA'
-            if packet.type == PacketType.TYPE_REQUEST_HANDSHAKE:
-                return 'REQUEST_HANDSHAKE'
+
+    status, packet = Packet.from_serial(ser)
+    
+    if status == 'EMPTY':
+        return 'TIMEOUT'
+    
+    if status == 'CORRUPTED':
+        return 'NAK'
+    
+    if status == 'OK':
+        if packet.type == expected_type:
+            return 'ACK'
+        if packet.type == PacketType.TYPE_NAK:
+            return 'NAK'
+        if packet.type == PacketType.TYPE_WAITING_DATA:
+            return 'WAITING_DATA'
+        if packet.type == PacketType.TYPE_REQUEST_HANDSHAKE:
+            return 'REQUEST_HANDSHAKE'
         
-        return 'TIMEOUT'
-    except Exception as e:
-        print(f"\nErro ao aguardar pacote: {e}")
-        return 'TIMEOUT'
+    print(f"\n[SENDER] Erro de Sincronia: Esperado {expected_type}, Recebido {packet.type}")    
+    return 'TIMEOUT'
+
 
 def perform_handshake(ser, max_retries):
     print("Iniciando handshake...")
