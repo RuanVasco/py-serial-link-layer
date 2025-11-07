@@ -53,10 +53,10 @@ def main():
                                 print("[TIMER] Ficheiro parcial descartado.")                    
                     continue
                 
+                print("pacteo recebido")
                 timeout_counter = 0
                 
-                if packet.type == PacketType.TYPE_HANDSHAKE:
-                    print("recebido handshale")
+                if packet.type == PacketType.TYPE_HANDSHAKE:                    
                     if not new_connection:
                         send_response(ser, PacketType.TYPE_NAK)
                         continue
