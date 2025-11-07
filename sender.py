@@ -134,20 +134,19 @@ def main():
     ser = None
     
     params = ConnectionParams(
-        timeout = 90, 
+        timeout = 10, 
         max_retries = 90,
         data_size = 60, 
     ) 
             
-    ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
+    ser = serial.Serial(args.com, args.baudrate, timeout=params.timeout)
     while(True):
         try:           
             print(f"Tentando conectar na porta {args.com}...")
             if ser and ser.is_open:
                 ser.close()
             
-            ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
-            ser.timeout = params.timeout
+            ser = serial.Serial(args.com, args.baudrate, timeout=params.timeout)
             
             if not perform_handshake(ser, params.max_retries):
                 print("Handshake falhou, retentando conexão...")

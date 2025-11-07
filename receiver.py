@@ -27,9 +27,10 @@ def main():
     ser = None
     file_writer = None
     new_connection = True
+    
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
-        ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
+        ser = serial.Serial(args.com, args.baudrate, timeout=3.0) 
         while True:
             try:
                 packet = Packet.from_serial(ser)
