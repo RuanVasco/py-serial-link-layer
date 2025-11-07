@@ -56,6 +56,7 @@ def main():
                 timeout_counter = 0
                 
                 if packet.type == PacketType.TYPE_HANDSHAKE:
+                    print("recebido handshale")
                     if not new_connection:
                         send_response(ser, PacketType.TYPE_NAK)
                         continue
