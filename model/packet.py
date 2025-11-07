@@ -20,9 +20,7 @@ class Packet():
         self.crc_bytes = struct.pack('>I', zlib.crc32(self.data))
         
     def _serialize_data(self, type, data):
-        if type == PacketType.TYPE_PARAMS and isinstance(data, ConnectionParams):
-            data_to_serialize = data.__dict__
-        elif type == PacketType.TYPE_DATA and isinstance(data, bytes):
+        if type == PacketType.TYPE_DATA and isinstance(data, bytes):
             data_to_serialize = base64.b64encode(data).decode('utf-8')
         else:
             data_to_serialize = data
@@ -83,9 +81,7 @@ class Packet():
                 return None
 
             if packet.type == PacketType.TYPE_DATA:
-                packet.data = base64.b64decode(decoded_payload)
-            elif packet.type == PacketType.TYPE_PARAMS:
-                packet.data = ConnectionParams(**decoded_payload)
+                packet.data = base64.b64decode(decoded_payload)            
             else:
                 packet.data = decoded_payload
                 
