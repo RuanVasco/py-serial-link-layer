@@ -40,8 +40,6 @@ def perform_handshake(ser, max_retries):
         print(f"Tentativa de handshake [{attempt + 1}/{max_retries}]...")
         try: 
             ser.reset_input_buffer() 
-            print(f"len de data {len(packet.data)}\n")
-            print(f"len {struct.unpack('>H', packet.length)[0]}\n")
             ser.write(packet.get_full_packet_bytes())
             
             response = wait_for_packet(ser, PacketType.TYPE_HANDSHAKE)

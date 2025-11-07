@@ -49,6 +49,7 @@ class Packet():
         try:
             type_header_bytes = ser.read(2)
             length_header_bytes = ser.read(2)
+            
             if len(type_header_bytes) < 2 or len(length_header_bytes) < 2:
                 return None 
 
@@ -59,9 +60,8 @@ class Packet():
             crc_bytes = ser.read(CRC_SIZE)
 
             if len(payload_data) < payload_length or len(crc_bytes) < CRC_SIZE:
-                print(len(payload_data))
-                print(payload_length)
-                print("\nErro: Pacote incompleto (payload/crc).")
+                print("\nErro: Pacote incompleto (payload/crc). DESSINCRONIZADO.")
+                ser.reset_input_buffer()
                 return None 
 
             packet = cls.__new__(cls)

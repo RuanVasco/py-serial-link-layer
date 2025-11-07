@@ -50,7 +50,9 @@ def main():
                             if file_writer:
                                 file_writer.close()
                                 file_writer = None
-                                print("[TIMER] Ficheiro parcial descartado.")                    
+                                print("[TIMER] Ficheiro parcial descartado.")  
+                                    
+                    ser.reset_input_buffer()              
                     continue
                 
                 timeout_counter = 0
