@@ -159,34 +159,38 @@ def main():
         data_size = 60, 
     ) 
             
-    new_connection = True
     ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
-    
     while(True):
         try:           
-            if new_connection:
-                if not perform_handshake(ser, params.max_retries):
-                    ser.close()
-                    time.sleep(2)
-                    continue
-                
-                if not send_connection_params(ser, params):
-                    ser.close()
-                    time.sleep(2)
-                    continue
-                
-                new_connection = False
-                
-            send_file_in_chunks(ser, args.path, params.data_size, params.max_retries)                
+            print(f"Tentando conectar na porta {args.com}...")
+            if ser and ser.is_open:
+                ser.close()
+            
+            ser = serial.Serial(args.com, args.baudrate, timeout=2.0)
+            ser.timeout = params.timeout
+            
+            if not perform_handshake(ser, params.max_retries):
+                print("Handshake falhou, retentando conexão...")
+                time.sleep(2)
+                continue
+            
+            if not send_connection_params(ser, params):
+                print("Envio de parâmetros falhou, retentando conexão...")
+                time.sleep(2)
+                continue
+                                
+            if not send_file_in_chunks(ser, args.path, params.data_size, params.max_retries):
+                print("Falha ao enviar arquivo (timeout), retentando conexão...")
+                time.sleep(2)
+                continue   
+            
+            print("Arquivo enviado com sucesso!")           
             break
             
         except serial.SerialException as e:
-            print(f"Erro de hardware: {e}")
+            print(f"Erro de hardware (porta removida?): {e}")
             print(f"Tentando reconectar em 2 segundos...")
-            if ser and ser.is_open:
-                ser.close()
             time.sleep(2)
-            ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
         
         except KeyboardInterrupt:
             print("\nEnvio cancelado pelo usuário.")

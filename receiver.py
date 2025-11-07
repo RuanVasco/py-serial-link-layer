@@ -69,6 +69,7 @@ def main():
                         file_writer = None
                     send_response(ser, PacketType.TYPE_ACK)
                     print(f"Arquivo salvo com sucesso em {output_filepath}. Reiniciando...")
+                    new_connection = True
                 else:
                     print(f"Pacote de tipo inesperado recebido: {packet.type}")
                     send_response(ser, PacketType.TYPE_NAK)
@@ -80,7 +81,6 @@ def main():
                 ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
             except Exception as e:
                 print(f"Erro inesperado no loop: {e}")
-
     except KeyboardInterrupt:
         print("\nReceptor encerrado pelo usuário.")
     except serial.SerialException as e:
@@ -92,7 +92,6 @@ def main():
             
         if ser and ser.is_open:
             ser.close()
-        
 
 if __name__ == "__main__":
     main()
