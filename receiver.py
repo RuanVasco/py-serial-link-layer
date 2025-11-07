@@ -28,6 +28,9 @@ def main():
     file_writer = None
     new_connection = True
     
+    timeout_inactivity = 10 
+    timeout_counter = 0
+        
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
         ser = serial.Serial(args.com, args.baudrate, timeout=3.0) 
@@ -35,7 +38,23 @@ def main():
             try:
                 packet = Packet.from_serial(ser)
                 if not packet:
+                    if not new_connection:
+                        timeout_counter += 1
+                        print(f"Inatividade detetada... ({timeout_counter}/{timeout_inactivity})", end='\r')
+                        
+                        if timeout_counter >= timeout_inactivity:
+                            print("\n[TIMER] Limite de inatividade atingido. Resetando estado da conexão.")
+                            new_connection = True 
+                            timeout_counter = 0   
+                            
+                            if file_writer:
+                                file_writer.close()
+                                file_writer = None
+                                print("[TIMER] Ficheiro parcial descartado.")                    
                     continue
+                
+                timeout_counter = 0
+                
                 if packet.type == PacketType.TYPE_HANDSHAKE:
                     if not new_connection:
                         send_response(ser, PacketType.TYPE_NAK)

@@ -57,6 +57,7 @@ class Packet():
             payload_length = struct.unpack('>H', length_header_bytes)[0]
 
             payload_data = ser.read(payload_length)
+            
             crc_bytes = ser.read(CRC_SIZE)
             if len(payload_data) < payload_length or len(crc_bytes) < CRC_SIZE:
                 print("\nErro: Pacote incompleto (payload/crc).")
