@@ -33,7 +33,7 @@ def main():
         
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
-        ser = serial.Serial(args.com, args.baudrate, timeout=1.0) 
+        ser = serial.Serial(args.com, args.baudrate, timeout=3.0) 
         while True:
             try:
                 packet = Packet.from_serial(ser)
