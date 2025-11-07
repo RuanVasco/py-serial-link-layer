@@ -33,7 +33,7 @@ def main():
         
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
-        ser = serial.Serial(args.com, args.baudrate, timeout=3.0) 
+        ser = serial.Serial(args.com, args.baudrate, timeout=1.0) 
         while True:
             try:
                 packet = Packet.from_serial(ser)
@@ -84,7 +84,7 @@ def main():
                 if ser and ser.is_open:
                     ser.close()
                 time.sleep(2)
-                ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
+                ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
             except Exception as e:
                 print(f"Erro inesperado no loop: {e}")
     except KeyboardInterrupt:

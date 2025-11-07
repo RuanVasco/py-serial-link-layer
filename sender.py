@@ -134,7 +134,7 @@ def main():
     ser = None
     
     params = ConnectionParams(
-        timeout = 10, 
+        timeout = 1, 
         max_retries = 90,
         data_size = 60, 
     ) 
