@@ -33,15 +33,14 @@ def main():
         
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
-        ser = serial.Serial(args.com, args.baudrate, timeout=3.0) 
+        ser = serial.Serial(args.com, args.baudrate, timeout=1.0) 
         while True:
             try:
                 packet = Packet.from_serial(ser)
-                print(packet)
                 if not packet:
                     if not new_connection:
                         timeout_counter += 1
-                        print(f"Inatividade detetada... ({timeout_counter}/{timeout_inactivity})", end='\r')
+                        print(f"Inatividade detectada... ({timeout_counter}/{timeout_inactivity})", end='\r')
                         
                         if timeout_counter >= timeout_inactivity:
                             print("\n[TIMER] Limite de inatividade atingido. Resetando estado da conexão.")

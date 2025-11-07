@@ -19,6 +19,9 @@ class Packet():
         self.length = struct.pack('>H', len(self.data))
         self.crc_bytes = struct.pack('>I', zlib.crc32(self.data))
         
+        print(f"tamanho do payload_data {len(self.data)}")
+        print(f"length {len(self.length)}")
+        
     def _serialize_data(self, type, data):
         if type == PacketType.TYPE_DATA and isinstance(data, bytes):
             data_to_serialize = base64.b64encode(data).decode('utf-8')
@@ -58,7 +61,10 @@ class Packet():
 
             payload_data = ser.read(payload_length)
             crc_bytes = ser.read(CRC_SIZE)
+
             if len(payload_data) < payload_length or len(crc_bytes) < CRC_SIZE:
+                print(len(payload_data))
+                print(payload_length)
                 print("\nErro: Pacote incompleto (payload/crc).")
                 return None 
 

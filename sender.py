@@ -33,12 +33,12 @@ def wait_for_packet(ser, expected_type):
 
 def perform_handshake(ser, max_retries):
     print("Iniciando handshake...")
-    packet = Packet(PacketType.TYPE_HANDSHAKE, "")
-    ser.reset_input_buffer() 
+    packet = Packet(PacketType.TYPE_HANDSHAKE, "")    
     
     for attempt in range(max_retries):
         print(f"Tentativa de handshake [{attempt + 1}/{max_retries}]...")
         try: 
+            ser.reset_input_buffer() 
             ser.write(packet.get_full_packet_bytes())
             
             response = wait_for_packet(ser, PacketType.TYPE_HANDSHAKE)
