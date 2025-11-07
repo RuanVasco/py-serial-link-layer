@@ -46,10 +46,12 @@ class Packet():
     @classmethod
     def from_serial(cls, ser):
         CRC_SIZE = 4 
+        print(CRC_SIZE)
         
         try:
             type_header_bytes = ser.read(2)
             length_header_bytes = ser.read(2)
+            print(len(type_header_bytes) < 2 or len(length_header_bytes) < 2)
             if len(type_header_bytes) < 2 or len(length_header_bytes) < 2:
                 return None 
 

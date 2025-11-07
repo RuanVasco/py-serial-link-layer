@@ -53,7 +53,6 @@ def main():
                                 print("[TIMER] Ficheiro parcial descartado.")                    
                     continue
                 
-                print("pacteo recebido")
                 timeout_counter = 0
                 
                 if packet.type == PacketType.TYPE_HANDSHAKE:                    
