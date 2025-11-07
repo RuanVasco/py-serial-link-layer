@@ -59,11 +59,14 @@ def main():
                 
                 if packet.type == PacketType.TYPE_HANDSHAKE:                    
                     if not new_connection:
-                        send_response(ser, PacketType.TYPE_NAK)
+                        send_response(ser, PacketType.TYPE_WAITING_DATA)
                         continue
                     print("Handshake recebido. Enviando resposta...")
                     send_response(ser, PacketType.TYPE_HANDSHAKE)                    
                 elif packet.type == PacketType.TYPE_DATA:
+                    if new_connection:
+                        send_response(ser, PacketType.TYPE_REQUEST_HANDSHAKE)
+                        continue
                     new_connection = False
                     if file_writer is None:
                         file_writer = open(output_filepath, 'wb')
@@ -78,6 +81,10 @@ def main():
                     send_response(ser, PacketType.TYPE_ACK)
                     print(f"Arquivo salvo com sucesso em {output_filepath}. Reiniciando...")
                     new_connection = True
+                elif packet.type == PacketType.TYPE_RESET_CONNECTION:
+                    print("Resetando conexão...")
+                    new_connection = True
+                    continue
                 else:
                     print(f"Pacote de tipo inesperado recebido: {packet.type}")
                     send_response(ser, PacketType.TYPE_NAK)

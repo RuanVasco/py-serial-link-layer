@@ -7,3 +7,6 @@ class PacketType(Enum):
     TYPE_ACK = 3
     TYPE_NAK = 4
     TYPE_TIMEOUT = 5
+    TYPE_REQUEST_HANDSHAKE = 6
+    TYPE_RESET_CONNECTION = 7
+    TYPE_WAITING_DATA = 8

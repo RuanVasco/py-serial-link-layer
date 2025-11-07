@@ -26,6 +26,10 @@ def wait_for_packet(ser, expected_type):
                 return 'ACK' 
             if packet.type == PacketType.TYPE_NAK:
                 return 'NAK'
+            if packet.type == PacketType.TYPE_WAITING_DATA:
+                return 'WAITING_DATA'
+            if packet.type == PacketType.TYPE_REQUEST_HANDSHAKE:
+                return 'REQUEST_HANDSHAKE'
         
         return 'TIMEOUT'
     except Exception as e:
@@ -47,6 +51,11 @@ def perform_handshake(ser, max_retries):
             if response == 'ACK': 
                 print("Handshake bem-sucedido! O receptor está pronto.")
                 return True
+            elif response == 'WAITING_DATA':
+                print("Receptor esperando dados, solicitando para resetar conexão...")
+                reset_conneciton_packet = Packet(PacketType.TYPE_RESET_CONNECTION, "")
+                ser.write(reset_conneciton_packet.get_full_packet_bytes())
+                continue            
             else:
                 print(f"Resposta não recebida ou incorreta.")
                 
@@ -91,6 +100,9 @@ def send_file_in_chunks(ser, filepath, data_size, max_retries):
                 elif response == 'NAK':
                     print(f"\nReceptor reportou erro (NAK). Retentando chunk... ({retries + 1})")
                     retries += 1
+                elif response == 'REQUEST_HANDSHAKE':
+                    print("Receptor esperando handshake, reiniciando conexão..")
+                    return False
                 else: 
                     print(f"\nSem resposta do receptor (timeout). Retentando... ({retries + 1})")
                     retries += 1
