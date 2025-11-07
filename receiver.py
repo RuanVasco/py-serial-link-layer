@@ -37,6 +37,7 @@ def main():
         while True:
             try:
                 packet = Packet.from_serial(ser)
+                print(packet)
                 if not packet:
                     if not new_connection:
                         timeout_counter += 1
