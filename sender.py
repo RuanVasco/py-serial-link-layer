@@ -59,26 +59,6 @@ def perform_handshake(ser, max_retries):
     print("Falha no handshake após todas as tentativas.")
     return False
 
-def send_connection_params(ser, params):
-    packet = Packet(PacketType.TYPE_PARAMS, params)
-    
-    for attempt in range(params.max_retries):
-        print(f"Enviando parâmetros da conexão, tentativa [{attempt + 1}/{params.max_retries}]...")
-        ser.write(packet.get_full_packet_bytes())
-        
-        response = wait_for_packet(ser, PacketType.TYPE_ACK)
-            
-        if response == 'ACK':
-            print(f"Parâmetros enviados e confirmados.")
-            return True
-        elif response == 'NAK':
-            print(f"\nReceptor reportou erro (NAK). Retentando...")
-        else: 
-            print(f"\nSem resposta do receptor (timeout). Retentando...")
-    
-    print("Falha no envio dos parâmetros após todas as tentativas.")
-    return False
-
 def send_file_in_chunks(ser, filepath, data_size, max_retries):
     if not os.path.exists(filepath):
         print(f"Erro: Arquivo '{filepath}' não encontrado.")
@@ -159,26 +139,21 @@ def main():
         data_size = 60, 
     ) 
             
-    ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
+    ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
     while(True):
         try:           
             print(f"Tentando conectar na porta {args.com}...")
             if ser and ser.is_open:
                 ser.close()
             
-            ser = serial.Serial(args.com, args.baudrate, timeout=2.0)
+            ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
             ser.timeout = params.timeout
             
             if not perform_handshake(ser, params.max_retries):
                 print("Handshake falhou, retentando conexão...")
                 time.sleep(2)
                 continue
-            
-            if not send_connection_params(ser, params):
-                print("Envio de parâmetros falhou, retentando conexão...")
-                time.sleep(2)
-                continue
-                                
+                                            
             if not send_file_in_chunks(ser, args.path, params.data_size, params.max_retries):
                 print("Falha ao enviar arquivo (timeout), retentando conexão...")
                 time.sleep(2)

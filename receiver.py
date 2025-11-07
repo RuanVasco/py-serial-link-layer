@@ -4,7 +4,6 @@ import sys
 import time
 import serial
 
-from model.connection_params import ConnectionParams
 from model.packet_type import PacketType
 from model.packet import Packet
 
@@ -28,10 +27,9 @@ def main():
     ser = None
     file_writer = None
     new_connection = True
-    current_params = ConnectionParams(timeout=90, max_retries=90, data_size=64) 
     print(f"Aguardando conexões em {args.com} a {args.baudrate} baud...")
     try:
-        ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
+        ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
         while True:
             try:
                 packet = Packet.from_serial(ser)
@@ -43,18 +41,6 @@ def main():
                         continue
                     print("Handshake recebido. Enviando resposta...")
                     send_response(ser, PacketType.TYPE_HANDSHAKE)                    
-                elif packet.type == PacketType.TYPE_PARAMS:
-                    if not new_connection:
-                        send_response(ser, PacketType.TYPE_NAK)
-                        continue
-                    try:
-                        current_params = packet.data
-                        ser.timeout = current_params.timeout
-                        print(f"Parâmetros recebidos e aplicados: {current_params.__dict__}")
-                        send_response(ser, PacketType.TYPE_ACK)
-                    except Exception as e:
-                        print(f"Erro ao processar parâmetros: {e}")
-                        send_response(ser, PacketType.TYPE_NAK)
                 elif packet.type == PacketType.TYPE_DATA:
                     new_connection = False
                     if file_writer is None:
@@ -78,7 +64,7 @@ def main():
                 if ser and ser.is_open:
                     ser.close()
                 time.sleep(2)
-                ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
+                ser = serial.Serial(args.com, args.baudrate, timeout=3.0)
             except Exception as e:
                 print(f"Erro inesperado no loop: {e}")
     except KeyboardInterrupt:
