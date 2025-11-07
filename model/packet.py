@@ -59,7 +59,7 @@ class Packet():
         crc_bytes = ser.read(CRC_SIZE)
 
         if len(payload_data) < payload_length or len(crc_bytes) < CRC_SIZE:
-            print("\nErro: Pacote incompleto (payload/crc). DESSINCRONIZADO.")
+            print("\nErro: Pacote incompleto.")
             ser.reset_input_buffer()
             return 'CORRUPTED', None 
 
