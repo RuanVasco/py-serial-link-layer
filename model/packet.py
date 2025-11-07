@@ -46,12 +46,10 @@ class Packet():
     @classmethod
     def from_serial(cls, ser):
         CRC_SIZE = 4 
-        print(CRC_SIZE)
         
         try:
             type_header_bytes = ser.read(2)
             length_header_bytes = ser.read(2)
-            print(len(type_header_bytes) < 2 or len(length_header_bytes) < 2)
             if len(type_header_bytes) < 2 or len(length_header_bytes) < 2:
                 return None 
 
@@ -59,8 +57,6 @@ class Packet():
             payload_length = struct.unpack('>H', length_header_bytes)[0]
 
             payload_data = ser.read(payload_length)
-            print(len(crc_bytes) < CRC_SIZE)
-            print(len(payload_data) < payload_length)
             crc_bytes = ser.read(CRC_SIZE)
             if len(payload_data) < payload_length or len(crc_bytes) < CRC_SIZE:
                 print("\nErro: Pacote incompleto (payload/crc).")
