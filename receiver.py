@@ -37,9 +37,9 @@ def main():
     
     while True:
         try:
-            print(f"Aguardando conexão na porta {args.com}...")
             ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
             print(f"Porta {args.com} aberta.")
+            print(f"Aguardando conexão na porta {args.com}...")
             
             state = STATE_AWAITING_HANDSHAKE
             timeout_counter = 0

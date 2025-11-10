@@ -3,9 +3,9 @@ import json
 import struct
 import zlib
 
-import serial
-
 from model.packet_type import PacketType
+
+SOH_BYTE = b'\x01'
        
 class Packet():
     def __init__(self, type: PacketType, data):
@@ -27,7 +27,7 @@ class Packet():
         return json.dumps(data_to_serialize)
     
     def get_full_packet_bytes(self):
-        return self.type + self.length + self.data + self.crc_bytes
+        return SOH_BYTE + self.type + self.length + self.data + self.crc_bytes
         
     def validate(self):
         if self.data is None or self.crc_bytes is None:
@@ -46,6 +46,15 @@ class Packet():
     def from_serial(cls, ser):
         CRC_SIZE = 4 
         
+        while True:
+            byte = ser.read(1)
+            
+            if not byte:
+                return 'EMPTY', None
+            
+            if byte == SOH_BYTE:
+                break
+        
         type_header_bytes = ser.read(2)
         length_header_bytes = ser.read(2)
         
@@ -59,9 +68,10 @@ class Packet():
         crc_bytes = ser.read(CRC_SIZE)
 
         if len(payload_data) < payload_length or len(crc_bytes) < CRC_SIZE:
+            print(f"Diferença de {len(payload_data)} para {payload_length}")
             print("\nErro: Pacote incompleto.")
             ser.reset_input_buffer()
-            return 'CORRUPTED', None 
+            return 'CORRUPTED', None
 
         packet = cls.__new__(cls)
         packet.type_bytes = type_header_bytes
