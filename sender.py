@@ -19,7 +19,6 @@ def generate_arguments():
     return parser.parse_args()
 
 def wait_for_packet(ser, expected_type):
-
     status, packet = Packet.from_serial(ser)
     
     if status == 'EMPTY':

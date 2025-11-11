@@ -35,22 +35,28 @@ def main():
     timeout_inactivity = 10 
     timeout_counter = 0
     
+    # first loop, try again if serial port was disconnected 
     while True:
         try:
             ser = serial.Serial(args.com, args.baudrate, timeout=1.0)
             print(f"Porta {args.com} aberta.")
             print(f"Aguardando conexão na porta {args.com}...")
             
+            # initial state is waiting for handshake
             state = STATE_AWAITING_HANDSHAKE
             timeout_counter = 0
+            
+            # reset file writer
             if file_writer:
                 file_writer.close()
                 file_writer = None
                 
+            # second loop, read packet from serial
             while True:
                 try:
                     status, packet = Packet.from_serial(ser)
                     
+                    # handle inactivity timeout
                     if status == 'EMPTY':
                         if state == STATE_RECEIVING_DATA:
                             send_response(ser, PacketType.TYPE_NAK)
@@ -66,6 +72,7 @@ def main():
                                     file_writer = None
                         continue
                     
+                    # handle corrupted packet
                     if status == 'CORRUPTED':
                         print("\nPacote corrompido recebido. Enviando NAK.")
                         send_response(ser, PacketType.TYPE_NAK)
@@ -73,14 +80,16 @@ def main():
 
                     timeout_counter = 0
                     
+                    # handle reset command from sender
                     if packet.type == PacketType.TYPE_RESET_CONNECTION:
-                        print("\n[RESET] Comando de reset recebido. Aguardando novo handshake.")
+                        print("\nComando de reset recebido. Aguardando novo handshake.")
                         state = STATE_AWAITING_HANDSHAKE
                         if file_writer:
                             file_writer.close()
                             file_writer = None
                         continue
 
+                    # state machine: awaiting handshake
                     if state == STATE_AWAITING_HANDSHAKE:
                         if packet.type == PacketType.TYPE_HANDSHAKE:
                             print("Handshake recebido. Enviando resposta.")
@@ -90,6 +99,7 @@ def main():
                             print(f"Pacote {packet.type} ignorado, aguardando HANDSHAKE.")
                             send_response(ser, PacketType.TYPE_REQUEST_HANDSHAKE)
 
+                    # state machine: receiving data
                     elif state == STATE_RECEIVING_DATA:
                         if packet.type == PacketType.TYPE_DATA:
                             if file_writer is None:
@@ -98,6 +108,7 @@ def main():
                             print(f"Recebido chunk de {len(packet.data)} bytes.", end='\r')
                             send_response(ser, PacketType.TYPE_ACK)
                         
+                        # end of file received
                         elif packet.type == PacketType.TYPE_EOF:
                             print("\nSinal de EOF recebido. Finalizando...")
                             if file_writer:
@@ -107,24 +118,32 @@ def main():
                             print(f"Arquivo salvo: {output_filepath}. Aguardando novo handshake.")
                             state = STATE_AWAITING_HANDSHAKE 
                             
+                        # ignore handshake during data transfer
                         elif packet.type == PacketType.TYPE_HANDSHAKE:
                             print("Handshake recebido no meio da transferência. Ignorando.")
                             send_response(ser, PacketType.TYPE_WAITING_DATA)
                         
+                        # handle unexpected packet
                         else:
                             print(f"Pacote {packet.type} inesperado. Enviando NAK.")
                             send_response(ser, PacketType.TYPE_NAK)
+                            
+                # handle hardware error during transfer
                 except serial.SerialException as e:
                     print(f"\nErro de Hardware (read/write): {e}. Fechando porta.")
                     break 
+                
+        # handle connection error
         except serial.SerialException as e:
             print(f"\nErro ao abrir porta {args.com}: {e}")
             print("Tentando novamente em 3 segundos...")
-        
+            
+        # handle user interrupt
         except KeyboardInterrupt:
             print("\nReceptor encerrado pelo usuário.")
             break 
         
+        # clean up resources
         finally:
             if file_writer:
                 file_writer.close()
